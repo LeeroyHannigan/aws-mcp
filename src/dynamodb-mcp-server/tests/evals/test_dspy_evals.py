@@ -294,6 +294,12 @@ Examples:
     )
     
     parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Output only JSON result (for API consumption)"
+    )
+
+    parser.add_argument(
         "--debug",
         action="store_true",
         help="Show raw JSON output for debugging"
@@ -314,15 +320,24 @@ Examples:
     if args.scenario and not sanitize_scenario_input(args.scenario):
         sys.exit(1)
     
-    # Show evaluation configuration
+    # If JSON flag is set, output only JSON and exit
+    if args.json:
+        result = run_basic_evaluation()
+        print(json.dumps(result, indent=2))
+        sys.exit(0)
+
+    # Run evaluation
+    result = run_enhanced_evaluation(model_name, scenario_name)
+    
+
+
+    # Show evaluation configuration (only for non-JSON output)
     print("🔧 EVALUATION CONFIGURATION")
     print("=" * 30)
     print(f"Model: {model_name}")
     print(f"Scenario: {scenario_name}")
     print()
-    
-    # Run evaluation
-    result = run_enhanced_evaluation(model_name, scenario_name)
+
     display_evaluation_results(result)
     
     # Show raw JSON for debugging if requested

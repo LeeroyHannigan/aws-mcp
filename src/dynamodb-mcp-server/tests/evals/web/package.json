@@ -1,0 +1,32 @@
+{
+  "name": "dynamodb-evals-web",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "concurrently \"uv run python api.py\" \"webpack serve --mode development\"",
+    "dev": "webpack serve --mode development",
+    "build": "webpack --mode production",
+    "api": "uv run python api.py"
+  },
+  "dependencies": {
+    "@cloudscape-design/components": "^3.0.0",
+    "@cloudscape-design/global-styles": "^1.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "concurrently": "^8.0.0",
+    "css-loader": "^6.0.0",
+    "html-webpack-plugin": "^5.0.0",
+    "style-loader": "^3.0.0",
+    "ts-loader": "^9.0.0",
+    "typescript": "^5.0.0",
+    "webpack": "^5.0.0",
+    "webpack-cli": "^5.0.0",
+    "webpack-dev-server": "^4.0.0"
+  }
+}
