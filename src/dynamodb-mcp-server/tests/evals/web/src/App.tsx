@@ -26,6 +26,7 @@ import {
 
 interface EvalResult {
   status: string;
+  model_name?: string;
   conversation: Array<{
     role: string;
     content: string;
@@ -115,7 +116,15 @@ interface HistoryEntry {
   id: number;
   timestamp: string;
   scenario_name: string;
+  model_name?: string;
   result: EvalResult;
+}
+
+interface Model {
+  modelId: string;
+  modelName: string;
+  providerName: string;
+  inferenceTypesSupported?: string[];
 }
 
 const App: React.FC = () => {
@@ -124,10 +133,13 @@ const App: React.FC = () => {
   const [activeHref, setActiveHref] = useState('/dashboard');
   const [progress, setProgress] = useState(0);
   const [selectedScenario, setSelectedScenario] = useState({ label: 'Simple E-commerce Schema', value: 'Simple E-commerce Schema' });
+  const [selectedModel, setSelectedModel] = useState({ label: 'Claude 3.5 Sonnet', value: 'anthropic.claude-3-5-sonnet-20240620-v1:0' });
+  const [models, setModels] = useState<Model[]>([]);
   const [promptContent, setPromptContent] = useState('');
   const [promptLoading, setPromptLoading] = useState(false);
   const [promptSaving, setPromptSaving] = useState(false);
   const [promptAlert, setPromptAlert] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+  const [evalAlert, setEvalAlert] = useState<{ type: 'success' | 'error', message: string } | null>(null);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -138,6 +150,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     loadScenarios();
+    loadModels();
   }, []);
 
   useEffect(() => {
@@ -152,6 +165,7 @@ const App: React.FC = () => {
   const runEvaluation = async () => {
     setIsRunning(true);
     setProgress(0);
+    setResults([]); // Clear previous results
     
     // Simulate progress over 150 seconds (2.5 minutes)
     const progressInterval = setInterval(() => {
@@ -169,7 +183,9 @@ const App: React.FC = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          scenario: selectedScenario.value
+          scenario: selectedScenario.value,
+          model: selectedModel.value,
+          model_name: selectedModel.label
         })
       });
       
@@ -178,16 +194,19 @@ const App: React.FC = () => {
       
       if (response.ok) {
         const result = await response.json();
-        setResults(prev => [result, ...prev]);
+        if (result.status === 'error') {
+          setEvalAlert({ type: 'error', message: result.message || 'Evaluation failed' });
+        } else {
+          result.model_name = selectedModel.label;
+          setResults(prev => [result, ...prev]);
+          setEvalAlert(null);
+        }
       } else {
         const error = await response.json();
-        console.error('Evaluation failed:', error);
-        alert(`Evaluation failed: ${error.error}`);
+        setEvalAlert({ type: 'error', message: error.message || error.error || 'Unknown error' });
       }
     } catch (error) {
-      clearInterval(progressInterval);
-      console.error('Error running evaluation:', error);
-      alert('Failed to connect to evaluation service. Make sure the API server is running.');
+      setEvalAlert({ type: 'error', message: 'Failed to connect to evaluation service. Make sure the API server is running.' });
     }
     setIsRunning(false);
     setProgress(0);
@@ -209,10 +228,17 @@ const App: React.FC = () => {
       <Container
         header={
           <Header variant="h2">
-            Evaluation Summary
-            <Badge color={result.status === 'success' ? 'green' : 'red'}>
-              {result.status}
-            </Badge>
+            <SpaceBetween direction="horizontal" size="xs">
+              <Box>Evaluation Summary</Box>
+
+              {result.model_name && (
+                <Badge color="severity-neutral">{result.model_name}</Badge>
+              )}
+
+            </SpaceBetween>
+
+
+
           </Header>
         }
       >
@@ -464,6 +490,43 @@ const App: React.FC = () => {
     }
   };
 
+  const loadModels = async () => {
+    try {
+      const response = await fetch('/models.json');
+      if (response.ok) {
+        const data = await response.json();
+        setModels(data.modelSummaries);
+      } else {
+        console.error('Failed to load models');
+      }
+    } catch (error) {
+      console.error('Failed to load models:', error);
+    }
+  };
+
+  const getModelOptions = () => {
+    const groupedModels = models.reduce((acc, model) => {
+      if (!acc[model.providerName]) {
+        acc[model.providerName] = [];
+      }
+      
+      const modelId = model.inferenceTypesSupported?.includes('INFERENCE_PROFILE') 
+        ? `us.${model.modelId}` 
+        : model.modelId;
+      
+      acc[model.providerName].push({
+        label: model.modelName,
+        value: modelId
+      });
+      return acc;
+    }, {} as Record<string, Array<{ label: string; value: string }>>);
+
+    return Object.entries(groupedModels).map(([providerName, options]) => ({
+      label: providerName,
+      options
+    }));
+  };
+
   const openModal = (title: string, content: string) => {
     setModalTitle(title);
     setModalContent(content);
@@ -501,13 +564,15 @@ const App: React.FC = () => {
                   key={entry.id}
                   header={
                     <Header variant="h2">
-                      <SpaceBetween direction="horizontal" size="s">
+                      <SpaceBetween direction="horizontal" size="xs">
                         <Box>Evaluation Summary</Box>
-                        <Badge color={entry.result.status === 'success' ? 'green' : 'red'}>
-                          {entry.result.status}
-                        </Badge>
-                        <Box variant="small">{new Date(entry.timestamp).toLocaleString()}</Box>
+               
+                        {(entry.result.model_name || entry.model_name) && (
+                          <Badge color="severity-neutral">{entry.result.model_name || entry.model_name}</Badge>
+                        )}
+                        
                       </SpaceBetween>
+                      <Box variant="small">{new Date(entry.timestamp).toLocaleString()}</Box>
                     </Header>
                   }
                 >
@@ -722,7 +787,7 @@ const App: React.FC = () => {
                 </SpaceBetween>
               }
             >
-              Prompt Editor
+              Context Editor
             </Header>
           }
         >
@@ -925,6 +990,15 @@ const App: React.FC = () => {
     return (
       <ContentLayout>
         <SpaceBetween direction="vertical" size="l">
+          {evalAlert && (
+            <Alert
+              type={evalAlert.type}
+              dismissible
+              onDismiss={() => setEvalAlert(null)}
+            >
+              {evalAlert.message}
+            </Alert>
+          )}
           <Container
             header={
               <Header
@@ -936,6 +1010,12 @@ const App: React.FC = () => {
                       onChange={({ detail }) => setSelectedScenario(detail.selectedOption as { label: string; value: string })}
                       options={scenarios.map(s => ({ label: s.name, value: s.name }))}
                       placeholder="Choose scenario"
+                    />
+                    <Select
+                      selectedOption={selectedModel}
+                      onChange={({ detail }) => setSelectedModel(detail.selectedOption as { label: string; value: string })}
+                      options={getModelOptions()}
+                      placeholder="Choose model"
                     />
                     <Button
                       variant="primary"
@@ -1054,7 +1134,7 @@ const App: React.FC = () => {
             items={[
               { type: "link", text: "Dashboard", href: "/dashboard" },
               { type: "link", text: "Scenarios", href: "/scenarios" },
-              { type: "link", text: "Prompt Editor", href: "/prompt-editor" },
+              { type: "link", text: "Context Editor", href: "/prompt-editor" },
               { type: "link", text: "History", href: "/history" },
               { type: "divider" },
               { 

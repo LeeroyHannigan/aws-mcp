@@ -161,7 +161,6 @@ Purpose: Step-by-step reasoned final design with complete justifications
 
 ## Aggregate Design Decisions
 [Explain how you identified aggregates based on access patterns and why certain data was grouped together or kept separate]
-- ALWAYS give an in-depth explanation of the choice you make when choosing the aggregate design.
 
 ## Table Designs
 

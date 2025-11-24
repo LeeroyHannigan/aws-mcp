@@ -30,7 +30,7 @@ PROMPT_PATH = Path(__file__).parent.parent.parent.parent / "awslabs" / "dynamodb
 HISTORY_DIR = Path(__file__).parent.parent / "evaluation_history"
 HISTORY_FILE = HISTORY_DIR / "evaluation_history.json"
 
-def save_to_history(result, scenario_name):
+def save_to_history(result, scenario_name, model_name=None):
     """Save evaluation result to history file."""
     try:
         # Create directory if it doesn't exist
@@ -47,6 +47,7 @@ def save_to_history(result, scenario_name):
             "id": len(history) + 1,
             "timestamp": datetime.now().isoformat(),
             "scenario_name": scenario_name,
+            "model_name": model_name,
             "result": result
         }
         history.append(history_entry)
@@ -66,23 +67,34 @@ def run_evaluation():
     try:
         data = request.get_json() or {}
         scenario_name = data.get('scenario', 'Simple E-commerce Schema')
+        model_id = data.get('model')
+        model_name = data.get('model_name')
         
-        # Call the evaluation function directly
+        # Call the evaluation function with the specified model
         result = run_enhanced_evaluation(
-            model_name=None,  # Use default
+            model_name=model_id,
             scenario_name=scenario_name,
             verbose=False  # Suppress output
         )
         
+        # Add model name to result
+        if model_name:
+            result['model_name'] = model_name
+        
         # Save to history
-        save_to_history(result, scenario_name)
+        save_to_history(result, scenario_name, model_name)
         
         return jsonify(result)
         
     except Exception as e:
+        error_msg = str(e)
+        error_type = type(e).__name__
+        
+        # Don't save failed evaluations to history
         return jsonify({
-            "error": str(e),
-            "type": type(e).__name__
+            "status": "error",
+            "message": error_msg,
+            "type": error_type
         }), 500
 
 @app.route('/api/history', methods=['GET'])

@@ -288,7 +288,7 @@ class StrandsConversationHandler:
             print(f"❌ Error during Strands conversation: {e}")
             import traceback
             traceback.print_exc()
-            return f"Error during conversation: {str(e)}", conversation
+            raise e  # Re-raise the exception instead of returning error string
 
 
 @dataclass
@@ -435,7 +435,11 @@ class EnhancedMultiTurnEvaluator:
             print(f"❌ Error during enhanced evaluation: {e}")
             import traceback
             traceback.print_exc()
-            return None
+            return {
+                "status": "error",
+                "message": str(e),
+                "timestamp": self._get_timestamp()
+            }
     
     def evaluate_scenarios(self, scenario: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -455,6 +459,10 @@ class EnhancedMultiTurnEvaluator:
                 "message": "Evaluation failed",
                 "timestamp": self._get_timestamp()
             }
+        
+        # Check if result is an error response
+        if isinstance(result, dict) and result.get("status") == "error":
+            return result
         
         return {
             "status": "success",
